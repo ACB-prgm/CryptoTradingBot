@@ -16,6 +16,7 @@ LIMIT = 0.05
 
 ### FIG
 ![Figure_1](https://user-images.githubusercontent.com/63984796/167147167-d6d6db1b-afc0-492b-987c-1131e26847b3.png)
+For clarification, the x-axis is showing all events where the price change was more than 5.0% in either direction over time.  The distance between points does NOT correlate with the amount of time between the events.  IE, the distance between p1 and p2 could represent one month, where the distance between p2 and p3 could represent 5 days.
 
 ### TRADES MADE:
 ```
@@ -37,3 +38,7 @@ bought 916.2169303805498 DOGE ($117.37) at $0.12810285. Money = 562.481067636436
 
 ### FINAL (start with $1000)
 `$562.48 + 4266.29 DOGE ($547.9) = 1110.38 TOTAL | POSITION CHANGE = 11.04`
+
+### ASSUMPTIONS
+- No trading fees (which is possible with crypto)
+- The DOGE will sell for the median of the bid and ask price
