@@ -1,17 +1,22 @@
 import robin_stocks.robinhood as rh
 import matplotlib.pyplot as plt
+from datetime import date
 import pickle
 
 
 SAVE_PATH = "TradingBot/hist.pickle"
+SYMBOL = "DOGE"
+INTERVAL = "day"
+SPAN = "3month"
 MONEY = 1000.00
-positions = {}
+LIMIT = 0.05
+positions = {} # structured as "purchase_price" : "position" aka amount of crypto purchased
 
 
 def main():
     money = MONEY
 
-    hist = get_historical("DOGE", interval="day", span="3month")
+    hist = get_historical(SYMBOL, interval=INTERVAL, span=SPAN)
     old_price = float(hist.pop(0).get("close_price"))
 
     # Variables for graphing and records
@@ -25,40 +30,35 @@ def main():
         change = get_percent_change(curr_price, old_price)
         old_price = curr_price
 
-        if change > 0.05 or change < -0.05:
+        if change > LIMIT or change < -LIMIT:
             changes.append(change)
             prices.append(curr_price)
 
             line_pos = len(prices) - 1
-            if change < -0.05: # BUY
+            if change < -LIMIT: # BUY
                 buy_lines.append(line_pos)
                 money = buy(money, change, curr_price)
-            elif change > 0.05: # SELL
+            elif change > LIMIT: # SELL
                 
                 if positions:
-                    sell_poss = []
+                    sells = []
                     for purchase_price in positions:
                         if purchase_price < curr_price: 
                             sell_lines.append(line_pos)
-                            sell_poss.append(purchase_price)
-                    for purchase_price in sell_poss:
-                        # calculation is wrong
+                            sells.append(purchase_price)
+                    for purchase_price in sells:
                         total_change = get_percent_change(curr_price, purchase_price)
                         position = positions.get(purchase_price)
                         del positions[purchase_price]
 
-                        profit = position * total_change
-                        sell_amount = profit + position
+                        profit = position * total_change # calc increase in value of position
+                        sell_amount = profit + position # how much the crypto is now worth
                         money += sell_amount
-                        print(f"sold ${round(sell_amount, 2)} of DOGE at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
+                        print(f"sold {position / curr_price} {SYMBOL} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
     
-    for purchase_price in positions: # Cash out
-        total_change = get_percent_change(curr_price, purchase_price)
-        position = positions.get(purchase_price)
-        sell_amount = (position * total_change) + position
-        money += sell_amount
+    position, value = get_position(SYMBOL)
     
-    print(f"final money = ${round(money, 2)} ({round(get_percent_change(money, MONEY)*100, 2)}%)")
+    print(f"\nfinal ${round(money, 2)} and {position} {SYMBOL} ({value}) | ({round(get_percent_change(money+value, MONEY)*100, 2)}%)")
 
     # Graph performance
     plt.plot(range(len(prices)), prices, "-bo")
@@ -74,18 +74,30 @@ def buy(money, change, curr_price):
     positions[curr_price] = buy_amount
     money -= buy_amount
 
-    print(f"bought ${round(buy_amount, 2)} of DOGE at ${curr_price}. Money = {money}")
+    print(f"bought {buy_amount / curr_price} {SYMBOL} (${buy_amount}) at ${curr_price}. Money = {money}")
 
     return money
+
+
+def get_position(symbol: str):
+    position = 0
+    value = 0
+    curr_price = get_current_price(symbol)
+
+    for amount in positions:
+        position += positions.get(amount) / curr_price
+    value = position * curr_price
+
+    return position, value
 
 
 def get_current_price(symbol: str):
     QUOTE = rh.crypto.get_crypto_quote(symbol)
     ask = float(QUOTE.get("ask_price"))
     bid = float(QUOTE.get("bid_price"))
-    spread = (bid+ask) / 2.0
+    avg_price = (bid+ask) / 2.0
 
-    return spread
+    return avg_price
 
 
 def get_historical(symbol: str, interval: str, span: str):
@@ -93,15 +105,17 @@ def get_historical(symbol: str, interval: str, span: str):
     try: 
         with open(SAVE_PATH, 'rb') as file:
             hist = pickle.load(file)
-            if not set(hist.get("args")).difference(args):
-                return hist.get("data")
+            if not set(hist.get("args")).difference(args): # check if args differ
+                if hist.get("day") == date.today().day: # check if data is more than a day old
+                    return hist.get("data")
             else:
                 pass
     except EOFError:
         pass
     
-    # If can't load OR args are different, make new API call
+    # If can't load pickle, data is old, OR args are different: make new API call
     hist = {
+        "day" : date.today().day,
         "args": args,
         "data" : rh.crypto.get_crypto_historicals(symbol, interval=interval, span=span)
     }
