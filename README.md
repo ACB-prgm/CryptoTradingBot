@@ -7,6 +7,7 @@ Currently, this works on a simple buy low, sell high strategy where all price ch
 - The LIMIT is currently arbitrary, so I would like to make an algorithm that analyzes a 5 year history and can determine the optimal LIMIT.  
 - Make safeguards for crashes and volatility changes, as this strategy only works for typical market fluctuations over medium to long periods.  
 - Potentially alter the trading frequency and LIMIT based upon the volatility of the market.
+- Integrate analyst ratings, news articles, and correlated stock changes. (These are farther away)
 
 
 ## SIMULATION
