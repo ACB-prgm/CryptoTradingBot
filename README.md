@@ -1,7 +1,12 @@
 # CryptoTradingBot
 A work-in-progress trading bot to trade crypto at a daily rate using the robinhood API.
 
-Currently, this works on a simple buy low, sell high strategy where all price changes greater than the LIMIT are considered for a trade.  The script keeps track of each purchase seperately so that it will only sell once a price change event exceeds its purchase price.  The LIMIT is currently arbitrary, so I would like to make an algorithm that analyzes a 5 year history and can determine the optimal LIMIT.  I also need to make safeguards for crashes and volatility changes, as this strategy only works for typical market fluctuations over medium to long periods.  The amount of crypto purchased at each event is currently determined by the magnitude of change as a percent of the user's available buying power.
+Currently, this works on a simple buy low, sell high strategy where all price changes greater than the LIMIT are considered for a trade.  The amount of crypto purchased at each event is currently determined by the magnitude of the change as a percent of the user's available buying power.  The script keeps track of each purchase seperately so that it will only sell once a price change event exceeds its purchase price.  
+
+### IDEAS
+- The LIMIT is currently arbitrary, so I would like to make an algorithm that analyzes a 5 year history and can determine the optimal LIMIT.  
+- Make safeguards for crashes and volatility changes, as this strategy only works for typical market fluctuations over medium to long periods.  
+- Potentially alter the trading frequency and LIMIT based upon the volatility of the market.
 
 
 Here is an simulation of the bot's trading patterns for DOGE over the last 3 months:
