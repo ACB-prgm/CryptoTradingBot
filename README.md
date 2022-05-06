@@ -9,6 +9,7 @@ Currently, this works on a simple buy low, sell high strategy where all price ch
 - Potentially alter the trading frequency and LIMIT based upon the volatility of the market.
 
 
+## SIMULATION
 Here is an simulation of the bot's trading patterns for DOGE over the last 3 months:
 ### PARAMETERS
 ```
