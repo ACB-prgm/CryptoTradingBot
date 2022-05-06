@@ -1,11 +1,13 @@
 import robin_stocks.robinhood as rh
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from datetime import date
 import pickle
+import os
 
 
-SAVE_PATH = "TradingBot/hist.pickle"
-SYMBOL = "DOGE"
+SAVE_DIR = "TradingBot/Pickles"
+SYMBOL = "BCH"
 INTERVAL = "day"
 SPAN = "3month"
 MONEY = 1000.00
@@ -14,9 +16,13 @@ positions = {} # structured as "purchase_price" : "position" aka amount of crypt
 
 
 def main():
-    money = MONEY
+    simulate(SYMBOL, INTERVAL, SPAN, LIMIT, MONEY)
 
-    hist = get_historical(SYMBOL, interval=INTERVAL, span=SPAN)
+
+def simulate(symbol: str, interval: str, span: str, limit: float, starting_money: float):
+    money = starting_money
+
+    hist = get_historical(symbol, interval, span)
     old_price = float(hist.pop(0).get("close_price"))
 
     # Variables for graphing and records
@@ -30,15 +36,15 @@ def main():
         change = get_percent_change(curr_price, old_price)
         old_price = curr_price
 
-        if change > LIMIT or change < -LIMIT:
+        if change > limit or change < -limit:
             changes.append(change)
             prices.append(curr_price)
 
             line_pos = len(prices) - 1
-            if change < -LIMIT: # BUY
+            if change < -limit: # BUY
                 buy_lines.append(line_pos)
-                money = buy(money, change, curr_price)
-            elif change > LIMIT: # SELL
+                money = buy(symbol, money, change, curr_price)
+            elif change > limit: # SELL
                 
                 if positions:
                     sells = []
@@ -54,27 +60,34 @@ def main():
                         profit = position * total_change # calc increase in value of position
                         sell_amount = profit + position # how much the crypto is now worth
                         money += sell_amount
-                        print(f"sold {position / curr_price} {SYMBOL} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
+                        print(f"sold {round(position / curr_price, 2)} {symbol} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
     
-    position, value = get_position(SYMBOL)
+    position, value = get_position(symbol)
+    position = round(position, 2)
+    money = round(money, 2)
     
-    print(f"\nfinal ${round(money, 2)} and {position} {SYMBOL} ({value}) | ({round(get_percent_change(money+value, MONEY)*100, 2)}%)")
+    print(f"\n FINAL ${money} + {position} {symbol} (${value}) = {money + value} TOTAL | POSITION CHANGE = {round(get_percent_change(money+value, starting_money)*100, 2)}%")
 
     # Graph performance
+    plt.figure(figsize=(20,5))
     plt.plot(range(len(prices)), prices, "-bo")
-    margin = 0.01
+    margin = get_avg(prices) * get_avg([abs(x) for x in changes])
     plt.vlines(buy_lines, [prices[y] - margin for y in buy_lines], [prices[y] + margin for y in buy_lines], colors="green")
     plt.vlines(sell_lines, [prices[y] - margin for y in sell_lines], [prices[y] + margin for y in sell_lines], colors="red")
-    [plt.annotate("{} ({})".format(y, round(changes[prices.index(y)], 2)), (x,y+.01), ha="center") for y,x in zip(prices, range(len(prices)))]
+    [plt.annotate("{} ({})".format(y, round(changes[prices.index(y)], 2)), (x,y + margin), ha="center") for y,x in zip(prices, range(len(prices)))]
+    plt.title("{}-{}-{}".format(symbol, span, interval).upper(), fontweight= "bold")
+    plt.xlabel(f"Changes > +/- {limit}", fontweight= "bold")
+    plt.ylabel("Price", fontweight= "bold")
+    plt.legend(handles=[Line2D([0], [0], color="green", lw=2, label='BUY'), Line2D([0], [0], color='red', lw=2, label='SELL')], loc='upper left')
     plt.show()
 
 
-def buy(money, change, curr_price):
+def buy(symbol, money, change, curr_price):
     buy_amount = abs(round(change * 3 * money, 2))
     positions[curr_price] = buy_amount
     money -= buy_amount
 
-    print(f"bought {buy_amount / curr_price} {SYMBOL} (${buy_amount}) at ${curr_price}. Money = {money}")
+    print(f"bought {round(buy_amount / curr_price, 2)} {symbol} (${buy_amount}) at ${curr_price}. Money = {money}")
 
     return money
 
@@ -101,27 +114,23 @@ def get_current_price(symbol: str):
 
 
 def get_historical(symbol: str, interval: str, span: str):
-    args = set(locals().values())
-    try: 
+    args = [symbol, interval, span]
+    SAVE_PATH = os.path.join(SAVE_DIR, f"{'-'.join(args)}.pickle")
+
+    if os.path.exists(SAVE_PATH): # Load data
         with open(SAVE_PATH, 'rb') as file:
             hist = pickle.load(file)
-            if not set(hist.get("args")).difference(args): # check if args differ
-                if hist.get("day") == date.today().day: # check if data is more than a day old
+            if not set(hist.get("args")).difference(args) or hist.get("day") != date.today().day: # check if args differ OR if data is more than a day old
                     return hist.get("data")
-            else:
-                pass
-    except EOFError:
-        pass
-    
-    # If can't load pickle, data is old, OR args are different: make new API call
-    hist = {
-        "day" : date.today().day,
-        "args": args,
-        "data" : rh.crypto.get_crypto_historicals(symbol, interval=interval, span=span)
-    }
-    with open(SAVE_PATH, 'wb') as file:
-        pickle.dump(hist, file)
-    return hist.get("data")
+    else: # If no file, data is old, OR args are different: make new API call
+        hist = {
+            "day" : date.today().day,
+            "args": args,
+            "data" : rh.crypto.get_crypto_historicals(symbol, interval=interval, span=span)
+        }
+        with open(SAVE_PATH, 'wb') as file:
+            pickle.dump(hist, file)
+        return hist.get("data")
 
 
 def get_percent_change(curr_price, old_price):
@@ -139,6 +148,10 @@ def rh_login():
 
 def rh_logout():
     rh.authentication.logout()
+
+
+def get_avg(array: list):
+    return sum(array) / len(array)
 
 
 if __name__ == "__main__":
