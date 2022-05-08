@@ -17,9 +17,12 @@ class RHSimulation:
         self.limit = limit
         self.starting_money = starting_money
         self.positions = {} # structured as "purchase_price" : "position" aka amount of crypto purchased
+        self.LOD = None
 
 
-    def simulate(self, interval: str, span: str, graph: bool = False, limit: float = None):
+    def simulate(self, interval: str, span: str, LOD: int = 1, limit: float = None):
+        self.LOD = LOD # 0 = outcome only, 1 += buy and sell reports, 2 += graph
+
         if not limit:
             limit = self.limit
         money = self.starting_money
@@ -62,15 +65,17 @@ class RHSimulation:
                             profit = position * total_change # calc increase in value of position
                             sell_amount = profit + position # how much the crypto is now worth
                             money += sell_amount
-                            print(f"sold {round(position / curr_price, 2)} {self.symbol} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
+                            if self.LOD > 0:
+                                print(f"sold {round(position / curr_price, 2)} {self.symbol} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
         
         position, value = self.get_sim_position(hist)
         position = round(position, 2)
+        value = round(value, 2)
         money = round(money, 2)
         
-        print(f"\n FINAL ${money} + {position} {self.symbol} (${value}) = {money + value} TOTAL | POSITION CHANGE = {round(self.get_percent_change(money+value, self.starting_money)*100, 2)}%")
+        print(f"\n FINAL ${money} + {position} {self.symbol} (${value}) = ${round(money + value, 2)} TOTAL | POSITION CHANGE = {round(self.get_percent_change(money+value, self.starting_money)*100, 2)}%")
 
-        if graph:
+        if LOD > 1:
             # Graph performance
             plt.figure(figsize=(20,5))
             plt.plot(range(len(prices)), prices, "-bo")
@@ -89,8 +94,8 @@ class RHSimulation:
         buy_amount = abs(round(change * 3 * money, 2))
         self.positions[curr_price] = buy_amount
         money -= buy_amount
-
-        print(f"bought {round(buy_amount / curr_price, 2)} {self.symbol} (${buy_amount}) at ${curr_price}. Money = {money}")
+        if self.LOD > 0:
+            print(f"bought {round(buy_amount / curr_price, 2)} {self.symbol} (${buy_amount}) at ${curr_price}. Money = {money}")
 
         return money
 

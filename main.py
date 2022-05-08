@@ -1,7 +1,21 @@
 import custom_packages.robinhoodAPI as RH
 
 
-SYMBOL = "DOGE"
+RH_Cryptos = [
+    "DOGE",
+    "BTC",
+    "ETH",
+    "SOL",
+    "SHIB",
+    "MATIC",
+    "LTC",
+    "BCH",
+    "ETC",
+    "BSV",
+    "COMP",
+]
+
+SYMBOL = "BTC"
 INTERVAL = "day"
 SPAN = "3month"
 MONEY = 1000.00
@@ -10,8 +24,10 @@ LIMIT = 0.05
 
 def main():
     RH.login()
-    bch = RH.RHSimulation(SYMBOL, LIMIT, MONEY)
-    bch.simulate(INTERVAL, SPAN, graph=True)
+    for crypto in RH_Cryptos:
+        x = RH.RHSimulation(crypto, LIMIT, MONEY)
+        x.simulate(INTERVAL, SPAN, LOD=0)
+    
     RH.logout()
 
 
