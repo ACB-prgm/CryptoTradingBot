@@ -1,4 +1,3 @@
-from xmlrpc.client import boolean
 import robin_stocks.robinhood as rh
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -12,20 +11,15 @@ SAVE_DIR = os.path.join("/".join(__file__.split("/")[:-1]), "Pickles")
 
 class RHSimulation:
 
-    def __init__(self, symbol: str, limit: float, starting_money: float) -> None:
+    def __init__(self, symbol: str) -> None:
         self.symbol = symbol
-        self.limit = limit
-        self.starting_money = starting_money
         self.positions = {} # structured as "purchase_price" : "position" aka amount of crypto purchased
         self.LOD = None
 
-
-    def simulate(self, interval: str, span: str, LOD: int = 1, limit: float = None):
+    def simulate(self, interval: str, span: str, limit: float, starting_money: float, LOD: int = 1):
         self.LOD = LOD # 0 = outcome only, 1 += buy and sell reports, 2 += graph
-
-        if not limit:
-            limit = self.limit
-        money = self.starting_money
+        self.positions = {}
+        money = starting_money
 
         hist = self.get_historical(interval, span)
         old_price = float(hist.pop(0).get("close_price"))
@@ -65,17 +59,18 @@ class RHSimulation:
                             profit = position * total_change # calc increase in value of position
                             sell_amount = profit + position # how much the crypto is now worth
                             money += sell_amount
-                            if self.LOD > 0:
+                            if LOD > 1:
                                 print(f"sold {round(position / curr_price, 2)} {self.symbol} (${round(sell_amount, 2)}) at ${curr_price} for {round(profit, 2)} profit ({round(total_change*100, 2)}%). Money = {money}")
         
         position, value = self.get_sim_position(hist)
         position = round(position, 2)
         value = round(value, 2)
         money = round(money, 2)
-        
-        print(f"\n FINAL ${money} + {position} {self.symbol} (${value}) = ${round(money + value, 2)} TOTAL | POSITION CHANGE = {round(self.get_percent_change(money+value, self.starting_money)*100, 2)}%")
+        position_change = round(self.get_percent_change(money+value, starting_money)*100, 2)
+        if LOD > 0:
+            print(f"FINAL ${money} + {position} {self.symbol} (${value}) = ${round(money + value, 2)} TOTAL | POSITION CHANGE = {position_change}%")
 
-        if LOD > 1:
+        if LOD > 2:
             # Graph performance
             plt.figure(figsize=(20,5))
             plt.plot(range(len(prices)), prices, "-bo")
@@ -88,13 +83,15 @@ class RHSimulation:
             plt.ylabel("Price", fontweight= "bold")
             plt.legend(handles=[Line2D([0], [0], color="green", lw=2, label='BUY'), Line2D([0], [0], color='red', lw=2, label='SELL')], loc='upper left')
             plt.show()
+        
+        return position_change
 
 
     def sim_buy(self, money, change, curr_price):
         buy_amount = abs(round(change * 3 * money, 2))
         self.positions[curr_price] = buy_amount
         money -= buy_amount
-        if self.LOD > 0:
+        if self.LOD > 1:
             print(f"bought {round(buy_amount / curr_price, 2)} {self.symbol} (${buy_amount}) at ${curr_price}. Money = {money}")
 
         return money
