@@ -113,11 +113,9 @@ class RHSimulation:
         return float(hist[-1].get("close_price"))
 
 
-    def get_historical(self, interval: str, span: str):
+    def get_historical(self, interval: str, span: str, stock: bool = False):
         args = [self.symbol, interval, span]
-
-        if not os.path.exists(SAVE_DIR):
-            os.mkdir(SAVE_DIR)
+        pickel_log()
 
         SAVE_PATH = os.path.join(SAVE_DIR, f"{'-'.join(args)}.pickle")
 
@@ -125,13 +123,21 @@ class RHSimulation:
             with open(SAVE_PATH, 'rb') as file:
                 hist = pickle.load(file)
                 if not set(hist.get("args")).difference(args) or hist.get("day") != date.today().day: # check if args differ OR if data is more than a day old
-                        return hist.get("data")
+                        if hist.get("data"):
+                            return hist.get("data")
         else: # If no file, data is old, OR args are different: make new API call
-            hist = {
-                "day" : date.today().day,
-                "args": args,
-                "data" : rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
-            }
+            if stock:
+                hist = {
+                    "day" : date.today().day,
+                    "args": args,
+                    "data" : rh.stocks.get_stock_historicals(self.symbol, interval=interval, span=span)
+                }
+            else:
+                hist = {
+                    "day" : date.today().day,
+                    "args": args,
+                    "data" : rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
+                }
             with open(SAVE_PATH, 'wb') as file:
                 pickle.dump(hist, file)
             return hist.get("data")
@@ -146,7 +152,25 @@ class RHSimulation:
 
 
 
-def get_current_price(self, symbol: str):
+def pickel_log():
+    SAVE_PATH = os.path.join(SAVE_DIR, "log.pickle")
+    if os.path.exists(SAVE_PATH):
+        with open(SAVE_PATH, "rb") as file:
+            picklelog = pickle.load(file)
+            if picklelog.get("last_accessed") != date.today().day:
+                os.rmdir(SAVE_DIR)
+    
+    if not os.path.exists(SAVE_DIR):
+        os.mkdir(SAVE_DIR)     
+
+    picklelog = {
+        "last_accessed" : date.today().day
+    }
+    with open(SAVE_PATH, "wb") as file:
+        pickle.dump(picklelog, file)
+
+
+def get_current_price(symbol: str):
         QUOTE = rh.crypto.get_crypto_quote(symbol)
         ask = float(QUOTE.get("ask_price"))
         bid = float(QUOTE.get("bid_price"))
