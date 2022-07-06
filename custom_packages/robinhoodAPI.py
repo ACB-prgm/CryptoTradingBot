@@ -3,10 +3,16 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from datetime import date
 import pickle
+import shutil
+import boto3
 import os
 
 
+# DOCS: http://www.robin-stocks.com/en/latest/robinhood.html
+
 SAVE_DIR = os.path.join("/".join(__file__.split("/")[:-1]), "Pickles")
+AWS_ID = "AKIAVVWQARCLO5TB6SNQ",
+AWS_KEY = "Bd9aIiVS0fCgDLiRZcNq6Lo91iVhoI2WUAygdXvp"
 
 
 class RHSimulation:
@@ -122,24 +128,21 @@ class RHSimulation:
         if os.path.exists(SAVE_PATH): # Load data
             with open(SAVE_PATH, 'rb') as file:
                 hist = pickle.load(file)
-                if not set(hist.get("args")).difference(args) or hist.get("day") != date.today().day: # check if args differ OR if data is more than a day old
-                        if hist.get("data"):
-                            return hist.get("data")
-        else: # If no file, data is old, OR args are different: make new API call
+                if hist.get("data"):
+                    return hist.get("data")
+        else: # If no file or data is old: make new API call
+            hist = {
+                    "day" : date.today().day,
+                    "args": args,
+                }
             if stock:
-                hist = {
-                    "day" : date.today().day,
-                    "args": args,
-                    "data" : rh.stocks.get_stock_historicals(self.symbol, interval=interval, span=span)
-                }
+                hist["data"] = rh.stocks.get_stock_historicals(self.symbol, interval=interval, span=span)
             else:
-                hist = {
-                    "day" : date.today().day,
-                    "args": args,
-                    "data" : rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
-                }
+                hist["data"] = rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
+
             with open(SAVE_PATH, 'wb') as file:
                 pickle.dump(hist, file)
+            
             return hist.get("data")
 
 
@@ -158,7 +161,7 @@ def pickel_log():
         with open(SAVE_PATH, "rb") as file:
             picklelog = pickle.load(file)
             if picklelog.get("last_accessed") != date.today().day:
-                os.rmdir(SAVE_DIR)
+                shutil.rmtree(SAVE_DIR)
     
     if not os.path.exists(SAVE_DIR):
         os.mkdir(SAVE_DIR)     
@@ -190,3 +193,5 @@ def login():
 
 def logout():
     rh.authentication.logout()
+
+s3_client = boto3.client("s3", aws_access_key_id=AWS_ID, aws_secret_access_key=AWS_KEY)
