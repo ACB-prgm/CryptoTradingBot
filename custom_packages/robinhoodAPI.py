@@ -1,18 +1,25 @@
 import robin_stocks.robinhood as rh
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from datetime import date
+from datetime import datetime
 import pickle
-import shutil
 import boto3
 import os
 
 
 # DOCS: http://www.robin-stocks.com/en/latest/robinhood.html
 
-SAVE_DIR = os.path.join("/".join(__file__.split("/")[:-1]), "Pickles")
-AWS_ID = "AKIAVVWQARCLO5TB6SNQ",
-AWS_KEY = "Bd9aIiVS0fCgDLiRZcNq6Lo91iVhoI2WUAygdXvp"
+DIR = "/".join(__file__.split("/")[:-1])
+
+
+with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f:
+    info = pickle.load(f)
+    IAM_ID = info.get("IAM_ID")
+    IAM_KEY = info.get("IAM_KEY")
+
+S3_BUCKET = "crypto-trading-bot-cache"
+
+print(IAM_ID)
 
 
 class RHSimulation:
@@ -120,19 +127,17 @@ class RHSimulation:
 
 
     def get_historical(self, interval: str, span: str, stock: bool = False):
-        args = [self.symbol, interval, span]
-        pickel_log()
+        args = "-".join([self.symbol, interval, span])
+        NOW = datetime.now()
+        log = pickle_log(args, NOW)
 
-        SAVE_PATH = os.path.join(SAVE_DIR, f"{'-'.join(args)}.pickle")
+        s3_client = boto3.client("s3", aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
 
-        if os.path.exists(SAVE_PATH): # Load data
-            with open(SAVE_PATH, 'rb') as file:
-                hist = pickle.load(file)
-                if hist.get("data"):
-                    return hist.get("data")
+        if args in log and log.get(args) + 5 < NOW.hour + NOW.minute: # Load data
+            s3_client.download_fileobj(S3_BUCKET, args, bytes(1))
         else: # If no file or data is old: make new API call
             hist = {
-                    "day" : date.today().day,
+                    "day" : NOW.day,
                     "args": args,
                 }
             if stock:
@@ -154,30 +159,34 @@ class RHSimulation:
         return sum(array) / len(array)
 
 
+def pickle_log(ids, NOW):
+    SAVE_PATH = os.path.join(DIR, "log.pickle")
 
-def pickel_log():
-    SAVE_PATH = os.path.join(SAVE_DIR, "log.pickle")
-    if os.path.exists(SAVE_PATH):
+    if os.path.exists(SAVE_PATH): # if a log file exists, load it in
         with open(SAVE_PATH, "rb") as file:
             picklelog = pickle.load(file)
-            if picklelog.get("last_accessed") != date.today().day:
-                shutil.rmtree(SAVE_DIR)
-    
-    if not os.path.exists(SAVE_DIR):
-        os.mkdir(SAVE_DIR)     
 
-    picklelog = {
-        "last_accessed" : date.today().day
-    }
+            if picklelog.get("last_accessed") != NOW.day: # empty bucket if > one day old
+                s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
+                s3.Bucket(S3_BUCKET).objects.all().delete()
+                picklelog = {"last_accessed" : NOW.day} # reset picklelog
+    else:
+        picklelog = {"last_accessed" : NOW.day}
+
+    new_log = picklelog
+    new_log[ids] = NOW.time().hour + NOW.time().minute
+    
     with open(SAVE_PATH, "wb") as file:
-        pickle.dump(picklelog, file)
+        pickle.dump(new_log, file)
+    
+    return picklelog
 
 
 def get_current_price(symbol: str):
         QUOTE = rh.crypto.get_crypto_quote(symbol)
         ask = float(QUOTE.get("ask_price"))
         bid = float(QUOTE.get("bid_price"))
-        avg_price = (bid+ask) / 2.0
+        avg_price = (bid + ask) / 2.0
 
         return avg_price
 
@@ -194,4 +203,11 @@ def login():
 def logout():
     rh.authentication.logout()
 
-s3_client = boto3.client("s3", aws_access_key_id=AWS_ID, aws_secret_access_key=AWS_KEY)
+
+# s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
+# # s3.create_bucket(Bucket=S3_BUCKET)
+# bucket = s3.Bucket(S3_BUCKET)
+# bucket.delete()
+# bucket.put_object(Body=pickle.dumps("Hello"), Key="hello")
+# for obj in bucket.objects.all():
+#     obj.delete()
