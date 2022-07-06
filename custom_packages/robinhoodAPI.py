@@ -11,15 +11,11 @@ import os
 
 DIR = "/".join(__file__.split("/")[:-1])
 
-
 with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f:
     info = pickle.load(f)
     IAM_ID = info.get("IAM_ID")
     IAM_KEY = info.get("IAM_KEY")
-
-S3_BUCKET = "crypto-trading-bot-cache"
-
-print(IAM_ID)
+    S3_BUCKET = "crypto-trading-bot-cache"
 
 
 class RHSimulation:
@@ -204,9 +200,9 @@ def logout():
     rh.authentication.logout()
 
 
-# s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
-# # s3.create_bucket(Bucket=S3_BUCKET)
-# bucket = s3.Bucket(S3_BUCKET)
+s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
+s3.create_bucket(Bucket=S3_BUCKET)
+bucket = s3.Bucket(S3_BUCKET)
 # bucket.delete()
 # bucket.put_object(Body=pickle.dumps("Hello"), Key="hello")
 # for obj in bucket.objects.all():
