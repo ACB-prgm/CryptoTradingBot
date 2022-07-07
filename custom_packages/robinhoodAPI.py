@@ -4,6 +4,7 @@ from matplotlib.lines import Line2D
 from datetime import datetime
 import pickle
 import boto3
+import io
 import os
 
 
@@ -11,7 +12,7 @@ import os
 
 DIR = "/".join(__file__.split("/")[:-1])
 
-with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f:
+with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f: # pickled the info so that AWS wouldn't hold the account
     info = pickle.load(f)
     IAM_ID = info.get("IAM_ID")
     IAM_KEY = info.get("IAM_KEY")
@@ -127,10 +128,13 @@ class RHSimulation:
         NOW = datetime.now()
         log = pickle_log(args, NOW)
 
-        s3_client = boto3.client("s3", aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
+        bucket = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY).Bucket(S3_BUCKET)
 
         if args in log and log.get(args) + 5 < NOW.hour + NOW.minute: # Load data
-            s3_client.download_fileobj(S3_BUCKET, args, bytes(1))
+            obj = io.BytesIO()
+            bucket.download_fileobj(Key="hello.pickle", Fileobj=obj)
+            obj.seek(0)
+            hist = pickle.load(obj)
         else: # If no file or data is old: make new API call
             hist = {
                     "day" : NOW.day,
@@ -141,8 +145,7 @@ class RHSimulation:
             else:
                 hist["data"] = rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
 
-            with open(SAVE_PATH, 'wb') as file:
-                pickle.dump(hist, file)
+            bucket.put_object(Body=pickle.dumps(hist), Key=args)
             
             return hist.get("data")
 
@@ -164,7 +167,7 @@ def pickle_log(ids, NOW):
 
             if picklelog.get("last_accessed") != NOW.day: # empty bucket if > one day old
                 s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
-                s3.Bucket(S3_BUCKET).objects.all().delete()
+                s3.Bucket(S3_BUCKET).objects.delete()
                 picklelog = {"last_accessed" : NOW.day} # reset picklelog
     else:
         picklelog = {"last_accessed" : NOW.day}
@@ -198,12 +201,3 @@ def login():
 
 def logout():
     rh.authentication.logout()
-
-
-s3 = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY)
-s3.create_bucket(Bucket=S3_BUCKET)
-bucket = s3.Bucket(S3_BUCKET)
-# bucket.delete()
-# bucket.put_object(Body=pickle.dumps("Hello"), Key="hello")
-# for obj in bucket.objects.all():
-#     obj.delete()

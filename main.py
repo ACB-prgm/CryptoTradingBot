@@ -29,6 +29,7 @@ MONEY = 100.00
 LIMIT = 0.05
 
 def main():
+    print("start")
     RH.login()
 
     # crypto = SYMBOL
