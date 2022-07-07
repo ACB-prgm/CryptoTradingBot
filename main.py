@@ -29,9 +29,6 @@ MONEY = 100.00
 LIMIT = 0.05
 
 def main():
-    print("start")
-    RH.login()
-
     # crypto = SYMBOL
     sp500 = anal.get_y_ticker("VOO") # because they have a negative correlation for some reason
     vix = anal.get_y_ticker("^VIX")
@@ -83,11 +80,13 @@ def main():
             PLOT = False
 
     print(f"betas success {success}")
-    # RH.logout()
+    
 
 
 if __name__ == "__main__":
+    RH.login()
     main()
+    # RH.logout()
 
 
 # https://robinhood.com

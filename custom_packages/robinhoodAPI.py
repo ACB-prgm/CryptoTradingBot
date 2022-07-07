@@ -11,6 +11,8 @@ import os
 # DOCS: http://www.robin-stocks.com/en/latest/robinhood.html
 
 DIR = "/".join(__file__.split("/")[:-1])
+CACHE_DIR = os.path.join(DIR, "PicklesCache")
+CACHE_MODE = "PICKLE"
 
 with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f: # pickled the info so that AWS wouldn't hold the account
     info = pickle.load(f)
@@ -18,6 +20,8 @@ with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f: # pickled the info s
     IAM_KEY = info.get("IAM_KEY")
     S3_BUCKET = "crypto-trading-bot-cache"
 
+bucket = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY).Bucket(S3_BUCKET)
+print("hi")
 
 class RHSimulation:
 
@@ -125,15 +129,18 @@ class RHSimulation:
 
     def get_historical(self, interval: str, span: str, stock: bool = False):
         args = "-".join([self.symbol, interval, span])
+        SAVE_PATH = os.path.join(CACHE_DIR, f"{args}.pickle")
         NOW = datetime.now()
         log = pickle_log(args, NOW)
 
-        bucket = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY).Bucket(S3_BUCKET)
-
         if args in log and log.get(args) + 5 < NOW.hour + NOW.minute: # Load data
-            obj = io.BytesIO()
-            bucket.download_fileobj(Key="hello.pickle", Fileobj=obj)
-            obj.seek(0)
+            if CACHE_MODE == "AWS":
+                obj = io.BytesIO()
+                bucket.download_fileobj(Key="hello.pickle", Fileobj=obj)
+                obj.seek(0)
+            else:
+                with open(SAVE_PATH, "rb") as f:
+                    obj = f
             hist = pickle.load(obj)
         else: # If no file or data is old: make new API call
             hist = {
@@ -144,9 +151,13 @@ class RHSimulation:
                 hist["data"] = rh.stocks.get_stock_historicals(self.symbol, interval=interval, span=span)
             else:
                 hist["data"] = rh.crypto.get_crypto_historicals(self.symbol, interval=interval, span=span)
-
-            bucket.put_object(Body=pickle.dumps(hist), Key=args)
             
+            if CACHE_MODE == "AWS":
+                bucket.put_object(Body=pickle.dumps(hist), Key=args)
+            else:
+                with open(SAVE_PATH, "wb") as f:
+                    pickle.dump(hist, f)
+
             return hist.get("data")
 
 
