@@ -21,7 +21,6 @@ with open(os.path.join(DIR, "aws_info.pickle"), "rb") as f: # pickled the info s
     S3_BUCKET = "crypto-trading-bot-cache"
 
 bucket = boto3.resource('s3', aws_access_key_id=IAM_ID, aws_secret_access_key=IAM_KEY).Bucket(S3_BUCKET)
-print("hi")
 
 class RHSimulation:
 
