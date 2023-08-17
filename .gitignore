@@ -1,3 +1,4 @@
 **/.DS_Store
 custom_packages/PicklesCache
 custom_packages/__pycache__
+TradingBotVenv/
