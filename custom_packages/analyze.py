@@ -1,4 +1,6 @@
+from statsmodels.tsa.arima.model import ARIMA
 from datetime import datetime
+import concurrent.futures
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -13,6 +15,37 @@ def describe(history):
 
     print("POSITIVE\n", pos_changes.describe())
     print("NEGATIVE\n", neg_changes.describe())
+
+def find_best_arima_order(df, max_p=32, max_d=1, max_q=7):
+    def arima_worker(p, d, q, data):
+        try:
+            model = ARIMA(data, order=(p, d, q))
+            model_fit = model.fit()
+            aic = model_fit.aic
+            return ((p, d, q), aic)
+        except:
+            return None
+    
+    # Calculate the daily returns
+    df['daily_returns'] = df['close_price'].pct_change().dropna()
+
+    tasks = [(p, d, q, df['daily_returns']) for p in range(max_p + 1) for d in range(max_d + 1) for q in range(max_q + 1)]
+    
+    # Multithreading the ARIMA tasks
+    best_aic = float('inf')
+    best_order = None
+    
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = list(executor.map(lambda x: arima_worker(*x), tasks))
+
+        for result in results:
+            if result is not None:
+                order, aic = result
+                if aic < best_aic:
+                    best_aic = aic
+                    best_order = order
+
+    return best_order
 
 
 def freedman_diaconis(data): # determines how many bins to use in a histogram for a set of data
@@ -48,6 +81,7 @@ def avg(array: list):
 
 def get_y_ticker(ticker: str):
     hist = yf.Ticker(ticker).history("5Y")["Close"].apply(pd.to_numeric, errors="coerce")
+    hist.index = hist.index.tz_localize(None)
     return hist.reindex(pd.date_range(start=hist.index.min(), end=hist.index.max(), freq='1D')).interpolate("pad")
 
 
@@ -80,9 +114,9 @@ def get_volatility_scores(crypto_object, span: str, score_interval: str = "week"
 
 def DT_formatted_hist(historical, fill_dates: bool = True):
     df = historical.drop(columns=["volume", "session", "interpolated", "symbol"]).apply(pd.to_numeric, errors="ignore")
-    df['begins_at'] = pd.to_datetime(df['begins_at']).dt.date
-    df['begins_at'] = pd.to_datetime(df['begins_at'])
-    df = df.set_index("begins_at")
+    df['date'] = pd.to_datetime(df['begins_at']).dt.date
+    df.drop(columns=["begins_at"], inplace=True)
+    df = df.set_index("date")
 
     if fill_dates:
         df = df.reindex(pd.date_range(start=df.index.min(), end=df.index.max(), freq='1D'))

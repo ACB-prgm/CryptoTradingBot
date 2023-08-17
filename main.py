@@ -27,6 +27,7 @@ INTERVAL = "week"
 SPAN = "year"
 MONEY = 100.00
 LIMIT = 0.05
+PLOT = True
 
 def main():
     # crypto = SYMBOL
@@ -34,32 +35,32 @@ def main():
     vix = anal.get_y_ticker("^VIX")
     success = 0
     for crypto in RH_cryptos:
+        print(crypto)
         other = RH.RHSimulation(crypto)
 
         df2 = anal.get_volatility_scores(other, span=SPAN, score_interval=INTERVAL)
-        crypto_hist = anal.DT_formatted_hist(pd.DataFrame(other.get_historical(INTERVAL, SPAN)))["close_price"].pct_change().abs()
-        
-        if INTERVAL != "day":
+        if INTERVAL == "day":
+            crypto_hist = anal.DT_formatted_hist(pd.DataFrame(other.get_historical(INTERVAL, SPAN)))["close_price"].pct_change().abs()
+        else:
             crypto_hist = anal.DT_formatted_hist(pd.DataFrame(other.get_historical(INTERVAL, SPAN)))["close_price"].pct_change().abs().resample(anal.RH_timestring_to_pd(INTERVAL), closed="left").std()
-
         
         custom = stats.spearmanr(crypto_hist, df2.loc[crypto_hist.index])
         SP500 = stats.spearmanr(crypto_hist, sp500.loc[crypto_hist.index])
         VIX = stats.spearmanr(crypto_hist, vix.loc[crypto_hist.index])
 
         # print(crypto)
-        # print(f"Custom : {custom} \nSP500 : {SP500} \nVIX {VIX}")
+        print(f"Custom : {custom} \nSP500 : {SP500} \nVIX {VIX}")
 
         custom = abs(custom[0] / custom[1])
         SP500 = abs(SP500[0] / SP500[1])
         VIX = abs(VIX[0] / VIX[1])
         
-        # print(f" Custom > SP500: {custom > SP500} \n Custom > VIX: {custom > VIX}\n")
+        print(f" Custom > SP500: {custom > SP500} \n Custom > VIX: {custom > VIX}\n")
         if custom > VIX or custom > SP500:
             success += 1
         # quit()
 
-        PLOT = False
+        _plot = PLOT
         if PLOT:
             fig, ax1 = plt.subplots(figsize=(20,5))
 
@@ -77,7 +78,7 @@ def main():
             plt.title(f"{crypto}-{INTERVAL}-{SPAN}")
             plt.show()
 
-            PLOT = False
+            _plot = False
 
     print(f"betas success {success}")
     
@@ -85,7 +86,11 @@ def main():
 
 if __name__ == "__main__":
     RH.login()
-    main()
+    # main()
+    ticker = "DOGE"
+    crypto = RH.RHSimulation(ticker)
+    x = anal.DT_formatted_hist(pd.DataFrame(crypto.get_historical(INTERVAL, SPAN)))
+    x.to_csv("DOGE.csv", index_label="date")
     # RH.logout()
 
 
